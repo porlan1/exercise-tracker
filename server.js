@@ -53,8 +53,11 @@ app.get('/api/exercise/log', (req, res)=>{
 
   let findQuery = exercise.find(queryObject);
   if (req.query.limit && Number.isInteger(parseInt(req.query.limit))) {
-    findQuery.limit(req.query.limit);
-  } 
+    findQuery.limit(parseInt(req.query.limit));
+  } else if (req.query.limit) {
+    res.send('Limit must be an integer');
+    return;
+  }
 
   findQuery.exec((err, docs)=>{
     if (err) {
