@@ -7,15 +7,96 @@ const cors = require('cors')
 const mongoose = require('mongoose')
 mongoose.connect(process.env.MLAB_URI || 'mongodb://localhost/exercise-track' )
 
-app.use(cors())
+var userSchema = mongoose.Schema({
+  userId: {type: Number},
+  username: { type: String, unique: true }
+});
 
-app.use(bodyParser.urlencoded({extended: false}))
-app.use(bodyParser.json())
+var exerciseSchema = mongoose.Schema({
+  duration: { type: Number, min: 1},
+  date: { type: Date, max: Date.now() },
+  userId: { type: Number, required: true },
+  description: { type: String, maxlength: 200 }
+});
+
+var user = mongoose.model('user', userSchema);
+var exercise = mongoose.model('exercise', exerciseSchema);
+
+app.use(cors());
+
+app.use(bodyParser.urlencoded({extended: false}));
+app.use(bodyParser.json());
 
 
 app.use(express.static('public'))
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
+});
+
+app.get('/api/exercise/log', (req, res)=>{
+  console.log(req.query);
+  let queryObject = {};
+  if (!req.query.userId) {
+    res.send('No user id sent!');
+    return;
+  }
+  queryObject.userId = req.query.userId;
+  if (req.query.from || req.query.to) {
+    queryObject.date = {};
+  }
+  if (req.query.from) {
+    queryObject.date['$gte'] = req.query.from;
+  }
+  if (req.query.to) {
+    queryObject.date['$lte'] = req.query.to;
+  } 
+
+  let findQuery = exercise.find(queryObject);
+  if (req.query.limit && Number.isInteger(parseInt(req.query.limit))) {
+    findQuery.limit(req.query.limit);
+  } 
+
+  findQuery.exec((err, docs)=>{
+    if (err) {
+      res.send(err)
+      return;
+    }
+    res.json(docs);
+  })
+});
+
+app.post('/api/exercise/new-user', (req, res)=>{
+  console.log(req.body);
+  user.find({}, ['userId'],
+  {
+    limit:1,
+    sort:{
+        userId: -1 //Sort by Date Added DESC
+    }
+  }, (err, docs) => {
+    let id = 1;
+    if (docs.length && docs[0].userId) {
+      id = docs[0].userId + 1;
+    }
+    req.body.userId = id;
+    user.create(req.body, (err, docs)=>{
+      if (err) {
+        res.send(err);
+        return;
+      }
+      res.json(docs);
+      });
+    });
+});
+
+app.post('/api/exercise/add', (req, res)=>{
+  exercise.create(req.body, (err, docs) => {
+    if (err) {
+      res.send(err);
+      return;
+    }
+    res.json(docs);
+  })
 });
 
 
