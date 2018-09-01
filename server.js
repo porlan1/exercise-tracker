@@ -61,17 +61,16 @@ app.get('/api/exercise/log', (req, res)=>{
       res.send(err)
       return;
     }
-    res.json(docs);
+    res.json(docs.map(el=>removeHiddenFields(el._doc)));
   })
 });
 
 app.post('/api/exercise/new-user', (req, res)=>{
-  console.log(req.body);
   user.find({}, ['userId'],
   {
     limit:1,
     sort:{
-        userId: -1 //Sort by Date Added DESC
+        userId: -1
     }
   }, (err, docs) => {
     let id = 1;
@@ -79,23 +78,28 @@ app.post('/api/exercise/new-user', (req, res)=>{
       id = docs[0].userId + 1;
     }
     req.body.userId = id;
-    user.create(req.body, (err, docs)=>{
+    user.create(req.body, (err, doc)=>{
       if (err) {
-        res.send(err);
+        let message = 'Whoops something went wrong try again.'
+        if (err.errmsg.includes('duplicate key')) {
+          message = 'User name already exist, please choose a different one.'
+        }
+        res.send(message);
         return;
       }
-      res.json(docs);
+      res.json(removeHiddenFields(doc._doc));
       });
     });
 });
 
 app.post('/api/exercise/add', (req, res)=>{
-  exercise.create(req.body, (err, docs) => {
+  exercise.create(req.body, (err, doc) => {
     if (err) {
-      res.send(err);
+      console.log(err)
+      res.send('Whoops something went wrong, try again');
       return;
     }
-    res.json(docs);
+    res.json(removeHiddenFields(doc._doc));
   })
 });
 
@@ -123,6 +127,13 @@ app.use((err, req, res, next) => {
   res.status(errCode).type('txt')
     .send(errMessage)
 })
+
+function removeHiddenFields(data) {
+  let dataCopy = Object.assign({}, data);
+  delete dataCopy['__v'];
+  delete dataCopy['_id']; 
+  return dataCopy;
+}
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
